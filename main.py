@@ -1,4 +1,4 @@
-import osimport os
+import os
 import requests
 import json
 import time
@@ -10,10 +10,10 @@ from telegram.ext import Updater, CommandHandler, CallbackContext
 # ----------------------------
 # CONFIG – variabili d'ambiente
 # ----------------------------
-BRAWL_API = os.environ.get("BRAWL_API")           # chiave API Brawl Stars
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN") # token bot Telegram
-CHAT_ID = os.environ.get("CHAT_ID")               # chat ID Telegram
-PLAYER_TAG = os.environ.get("PLAYER_TAG")         # tag giocatore
+BRAWL_API = os.environ.get("BRAWL_API")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
+PLAYER_TAG = os.environ.get("PLAYER_TAG")
 
 # ----------------------------
 # FLASK SERVER
@@ -103,5 +103,3 @@ Thread(target=telegram_bot).start()
 # ----------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
-
-
