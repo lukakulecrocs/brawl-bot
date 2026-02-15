@@ -1,9 +1,11 @@
-import os
+import osimport os
 import requests
 import json
 import time
 from flask import Flask
 from threading import Thread
+from telegram import Update, Bot
+from telegram.ext import Updater, CommandHandler, CallbackContext
 
 # ----------------------------
 # CONFIG – variabili d'ambiente
@@ -27,7 +29,8 @@ def home():
 # ----------------------------
 def bot_loop():
     headers = {"Authorization": f"Bearer {BRAWL_API}"}
-    url = f"https://api.brawlstars.com/v1/players/{PLAYER_TAG}"
+    url = f"https://api.brawlstars.com/v1/players/{PLAYER_TAG.replace('#','%23')}"
+    bot = Bot(token=TELEGRAM_TOKEN)
 
     while True:
         try:
@@ -38,19 +41,19 @@ def bot_loop():
                 time.sleep(300)
                 continue
 
+            # Legge trofei precedenti
             try:
                 with open("trophies.json", "r") as f:
                     old_trophies = json.load(f)["trophies"]
             except:
                 old_trophies = current_trophies
 
+            # Se cambia, invia notifica
             if current_trophies != old_trophies:
                 message = f"🚨 Il giocatore ha cambiato trofei!\nPrima: {old_trophies}\nOra: {current_trophies}"
-                requests.post(
-                    f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                    data={"chat_id": CHAT_ID, "text": message}
-                )
+                bot.send_message(chat_id=CHAT_ID, text=message)
 
+            # Salva nuovo stato
             with open("trophies.json", "w") as f:
                 json.dump({"trophies": current_trophies}, f)
 
@@ -61,12 +64,44 @@ def bot_loop():
         time.sleep(300)
 
 # ----------------------------
-# ESEGUI BOT IN THREAD
+# COMANDO TELEGRAM /status
+# ----------------------------
+def status(update: Update, context: CallbackContext):
+    bot = context.bot
+    headers = {"Authorization": f"Bearer {BRAWL_API}"}
+    url = f"https://api.brawlstars.com/v1/players/{PLAYER_TAG.replace('#','%23')}"
+    
+    try:
+        r = requests.get(url, headers=headers)
+        if r.status_code == 200:
+            data = r.json()
+            trophies = data.get("trophies", "sconosciuti")
+            bot.send_message(chat_id=update.effective_chat.id,
+                             text=f"Il giocatore ha {trophies} trofei. ⚡")
+        else:
+            bot.send_message(chat_id=update.effective_chat.id,
+                             text="Non sono riuscito a contattare il server Brawl Stars.")
+    except Exception as e:
+        bot.send_message(chat_id=update.effective_chat.id,
+                         text=f"Errore: {e}")
+
+def telegram_bot():
+    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("status", status))
+    updater.start_polling()
+    updater.idle()
+
+# ----------------------------
+# ESEGUI BOT AUTOMATICO E COMANDO TELEGRAM
 # ----------------------------
 Thread(target=bot_loop).start()
+Thread(target=telegram_bot).start()
 
 # ----------------------------
 # ESEGUI FLASK APP
 # ----------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
+
