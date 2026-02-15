@@ -85,6 +85,9 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=update.effective_chat.id,
                                        text=f"Errore: {e}")
 
+# ----------------------------
+# FUNZIONE TELEGRAM BOT
+# ----------------------------
 def telegram_bot():
     app_bot = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app_bot.add_handler(CommandHandler("status", status))
