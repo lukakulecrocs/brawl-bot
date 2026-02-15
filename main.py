@@ -4,16 +4,16 @@ import json
 import time
 from flask import Flask
 from threading import Thread
-from telegram import Update, Bot
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # ----------------------------
 # CONFIG – variabili d'ambiente
 # ----------------------------
-BRAWL_API = os.environ.get("BRAWL_API")
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
-PLAYER_TAG = os.environ.get("PLAYER_TAG")
+BRAWL_API = os.environ.get("BRAWL_API")           # chiave API Brawl Stars
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN") # token bot Telegram
+CHAT_ID = os.environ.get("CHAT_ID")               # chat ID Telegram
+PLAYER_TAG = os.environ.get("PLAYER_TAG")         # tag giocatore (senza #)
 
 # ----------------------------
 # FLASK SERVER
@@ -29,8 +29,9 @@ def home():
 # ----------------------------
 def bot_loop():
     headers = {"Authorization": f"Bearer {BRAWL_API}"}
-    url = f"https://api.brawlstars.com/v1/players/{PLAYER_TAG.replace('#','%23')}"
-    bot = Bot(token=TELEGRAM_TOKEN)
+    url = f"https://api.brawlstars.com/v1/players/%23{PLAYER_TAG}"  # il # va url encoded come %23
+    import telegram
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
     while True:
         try:
@@ -66,31 +67,28 @@ def bot_loop():
 # ----------------------------
 # COMANDO TELEGRAM /status
 # ----------------------------
-def status(update: Update, context: CallbackContext):
-    bot = context.bot
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     headers = {"Authorization": f"Bearer {BRAWL_API}"}
-    url = f"https://api.brawlstars.com/v1/players/{PLAYER_TAG.replace('#','%23')}"
-    
+    url = f"https://api.brawlstars.com/v1/players/%23{PLAYER_TAG}"
+
     try:
         r = requests.get(url, headers=headers)
         if r.status_code == 200:
             data = r.json()
             trophies = data.get("trophies", "sconosciuti")
-            bot.send_message(chat_id=update.effective_chat.id,
-                             text=f"Il giocatore ha {trophies} trofei. ⚡")
+            await context.bot.send_message(chat_id=update.effective_chat.id,
+                                           text=f"Il giocatore ha {trophies} trofei. ⚡")
         else:
-            bot.send_message(chat_id=update.effective_chat.id,
-                             text="Non sono riuscito a contattare il server Brawl Stars.")
+            await context.bot.send_message(chat_id=update.effective_chat.id,
+                                           text="Non sono riuscito a contattare il server Brawl Stars.")
     except Exception as e:
-        bot.send_message(chat_id=update.effective_chat.id,
-                         text=f"Errore: {e}")
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text=f"Errore: {e}")
 
 def telegram_bot():
-    updater = Updater(TELEGRAM_TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("status", status))
-    updater.start_polling()
-    updater.idle()
+    app_bot = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app_bot.add_handler(CommandHandler("status", status))
+    app_bot.run_polling()
 
 # ----------------------------
 # ESEGUI BOT AUTOMATICO E COMANDO TELEGRAM
