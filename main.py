@@ -1,14 +1,13 @@
-
 import os
-import time
+import asyncio
 import requests
 from flask import Flask
 from threading import Thread
-from telegram import Bot, Update
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # =========================
-# VARIABILI D'AMBIENTE
+# VARIABILI
 # =========================
 BRAWL_API = os.getenv("BRAWL_API")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -16,7 +15,7 @@ CHAT_ID = os.getenv("CHAT_ID")
 PLAYER_TAG = os.getenv("PLAYER_TAG")  # SENZA #
 
 # =========================
-# FLASK (serve solo per Render)
+# FLASK
 # =========================
 app = Flask(__name__)
 
@@ -24,8 +23,11 @@ app = Flask(__name__)
 def home():
     return "Bot online!"
 
+def run_flask():
+    app.run(host="0.0.0.0", port=8000)
+
 # =========================
-# STATO GIOCATORE
+# STATO
 # =========================
 last_trophies = None
 is_online = False
@@ -33,10 +35,9 @@ is_online = False
 # =========================
 # CONTROLLO OGNI 5 MINUTI
 # =========================
-def check_player():
+async def check_player(application):
     global last_trophies, is_online
 
-    bot = Bot(token=TELEGRAM_TOKEN)
     url = f"https://api.brawlstars.com/v1/players/%23{PLAYER_TAG}"
     headers = {"Authorization": f"Bearer {BRAWL_API}"}
 
@@ -53,9 +54,9 @@ def check_player():
 
                 elif current_trophies != last_trophies:
                     is_online = True
-                    bot.send_message(
+                    await application.bot.send_message(
                         chat_id=CHAT_ID,
-                        text="🟢 Il giocatore sta giocando! (trofei cambiati)"
+                        text="🟢 Il giocatore sta giocando!"
                     )
                     last_trophies = current_trophies
                 else:
@@ -64,33 +65,28 @@ def check_player():
         except Exception as e:
             print("Errore:", e)
 
-        time.sleep(300)  # 5 minuti
+        await asyncio.sleep(300)
 
 # =========================
 # COMANDO /status
 # =========================
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_online:
-        await update.message.reply_text("🟢 ONLINE (trofei cambiati)")
+        await update.message.reply_text("🟢 ONLINE")
     else:
-        await update.message.reply_text("🔴 OFFLINE (trofei invariati)")
+        await update.message.reply_text("🔴 OFFLINE")
 
 # =========================
-# AVVIO BOT TELEGRAM
+# MAIN
 # =========================
-def start_telegram():
+async def main():
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler("status", status))
-    application.run_polling()
 
-# =========================
-# AVVIO THREAD
-# =========================
-Thread(target=check_player).start()
-Thread(target=start_telegram).start()
+    asyncio.create_task(check_player(application))
 
-# =========================
-# AVVIO FLASK
-# =========================
+    await application.run_polling()
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    Thread(target=run_flask).start()
+    asyncio.run(main())
